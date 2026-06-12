@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>일차함수 레이저 조준기 게임</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome (게임 아이콘용) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0d0e15;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* 네온 텍스트 효과 */
+        .neon-text-blue {
+            text-shadow: 0 0 5px rgba(59, 130, 246, 0.5), 0 0 10px rgba(59, 130, 246, 0.8);
+        }
+        .neon-text-red {
+            text-shadow: 0 0 5px rgba(239, 68, 68, 0.5), 0 0 10px rgba(239, 68, 68, 0.8);
+        }
+        .neon-text-green {
+            text-shadow: 0 0 5px rgba(34, 197, 94, 0.5), 0 0 10px rgba(34, 197, 94, 0.8);
+        }
+        /* 네온 테두리 효과 */
+        .neon-border-blue {
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.4), inset 0 0 5px rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.6);
+        }
+        .neon-border-red {
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.4), inset 0 0 5px rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.6);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-center p-2 text-white">
+
+    <!-- 메인 컨테이너 (태블릿 가로 비율 최적화) -->
+    <div id="game-container" class="relative w-full max-w-5xl h-[95vh] max-h-[720px] bg-[#141522] rounded-2xl overflow-hidden shadow-2xl border border-slate-700 flex flex-col">
+        
+        <!-- [1] 인트로 / 대기 화면 -->
+        <div id="screen-intro" class="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-[#0e0f19] to-[#181a30] z-50 p-6">
+            <div class="text-center space-y-6 max-w-2xl">
+                <div class="inline-block px-4 py-1.5 bg-blue-900/50 text-blue-400 border border-blue-500/30 rounded-full text-xs font-semibold tracking-wider uppercase mb-2">
+                    MATH LASER DEFENDER
+                </div>
+                <h1 class="text-4xl md:text-5xl font-black font-orbitron tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-400">
+                    일차함수 레이저 조준기
+                </h1>
+                <p class="text-slate-400 text-sm md:text-base leading-relaxed">
+                    조정 점 <span class="text-red-400 font-bold">A</span>, <span class="text-blue-400 font-bold">B</span>를 드래그하여 정확한 일차함수 그래프를 그리세요.<br>
+                    올바른 레이저 각도를 맞추어 침공하는 수학 몬스터들을 파괴합시다!
+                </p>
+                
+                <!-- 게임 설명 카드 -->
+                <div class="grid grid-cols-3 gap-3 bg-[#1e213a]/60 p-4 rounded-xl text-xs text-left border border-slate-700">
+                    <div class="space-y-1">
+                        <div class="text-cyan-400 font-bold font-orbitron">STAGE 1</div>
+                        <p class="text-slate-300">기본 일차함수식</p>
+                        <p class="text-slate-500 text-[10px]">$y=ax+b$<br>$x=k$, $y=k$ (최대 3회)</p>
+                    </div>
+                    <div class="space-y-1 border-x border-slate-700 px-3">
+                        <div class="text-purple-400 font-bold font-orbitron">STAGE 2</div>
+                        <p class="text-slate-300">일차방정식 형태</p>
+                        <p class="text-slate-500 text-[10px]">$ax+by+c=0$<br>축 평행선 (최대 3회)</p>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-rose-400 font-bold font-orbitron">STAGE 3 (BOSS)</div>
+                        <p class="text-slate-300">역추적 보스전</p>
+                        <p class="text-slate-500 text-[10px]">그려진 레이저를 보고<br>수식 직접 맞추기 (최대 3회)</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
+                    <button id="btn-start" class="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold text-lg rounded-xl shadow-lg shadow-cyan-500/20 transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 w-48">
+                        게임 시작
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- [2] 상단 네비게이션 & HUD -->
+        <header id="game-hud" class="bg-[#1b1c2e] px-4 py-2.5 flex justify-between items-center border-b border-slate-800 z-40 select-none">
+            <div class="flex items-center gap-4">
+                <div class="flex flex-col">
+                    <div class="text-[10px] text-slate-400 font-bold font-orbitron">ROUND</div>
+                    <div id="hud-round" class="text-lg font-black text-cyan-400 font-orbitron">1 / 3</div>
+                </div>
+                <div class="h-6 w-[1px] bg-slate-700"></div>
+                <div class="flex flex-col">
+                    <div class="text-[10px] text-slate-400 font-bold font-orbitron">PROGRESS</div>
+                    <div id="hud-progress" class="text-sm font-bold text-slate-200 font-orbitron">1 / 7</div>
+                </div>
+            </div>
+
+            <!-- 미션 수식창 -->
+            <div id="mission-panel" class="px-5 py-1.5 bg-[#10111e] rounded-xl border border-cyan-500/40 flex items-center gap-3">
+                <span class="text-xs font-bold text-cyan-400 tracking-widest font-orbitron">MISSION:</span>
+                <span id="mission-formula" class="text-base md:text-lg font-black tracking-wide text-white drop-shadow-md font-orbitron">y = 2x + 1</span>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="flex flex-col items-end">
+                    <div class="text-[10px] text-slate-400 font-bold font-orbitron">COMBO</div>
+                    <div id="hud-combo" class="text-sm font-bold text-amber-400 font-orbitron">0 COMBO</div>
+                </div>
+                <div class="h-6 w-[1px] bg-slate-700"></div>
+                <div class="flex flex-col items-end">
+                    <div class="text-[10px] text-slate-400 font-bold font-orbitron">SCORE</div>
+                    <div id="hud-score" class="text-lg font-black text-green-400 font-orbitron">0</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- [3] 메인 게임플레이 공간 (가로 분할 레이아웃) -->
+        <div class="flex-1 flex flex-row relative overflow-hidden bg-[#10111e]">
+            
+            <!-- 왼쪽: 게임 캔버스 영역 -->
+            <div class="flex-1 relative flex items-center justify-center p-3">
+                <div id="canvas-wrapper" class="relative w-full aspect-square max-w-[500px] max-h-[500px] bg-slate-950 rounded-xl overflow-hidden shadow-inner border border-slate-800">
+                    <!-- 게임 핵심 캔버스 -->
+                    <canvas id="game-canvas" class="w-full h-full cursor-crosshair"></canvas>
+                    
+                    <!-- 콤보 및 점수 획득 통합 알림 문구 -->
+                    <div id="combo-popup" class="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-3xl font-extrabold text-amber-400 tracking-wider pointer-events-none opacity-0 scale-90 transition-all duration-300 z-20 font-orbitron text-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                        3 콤보!<br><span class="text-2xl text-emerald-400 font-black">+100점</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 컨트롤 타워 패널 (동적 반응형으로 레이아웃 전환) -->
+            <div class="w-72 border-l border-slate-800 bg-[#161726]/80 flex flex-col justify-between p-4 z-10 select-none overflow-y-auto">
+                
+                <!-- 패널 본문 영역 -->
+                <div class="space-y-4 flex-1 flex flex-col">
+                    
+                    <!-- [A] 1, 2라운드용 일반 UI (좌표 정보 & 조작 팁) -->
+                    <div id="normal-sidebar-ui" class="space-y-4">
+                        <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+                            <h4 class="text-xs font-bold text-slate-400 mb-2 flex items-center justify-between">
+                                <span><i class="fa-solid fa-compass"></i> 레이저 조정기 위치</span>
+                                <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">정수형 자석 모드</span>
+                            </h4>
+                            <!-- 조정 점 A 좌표 -->
+                            <div class="flex justify-between items-center text-xs mb-1.5">
+                                <span class="flex items-center gap-1.5 text-red-400 font-bold">
+                                    <span class="w-2.5 h-2.5 bg-red-500 rounded-full inline-block shadow"></span> 점 A
+                                </span>
+                                <span id="coord-a" class="font-bold font-orbitron text-slate-200">X: 0, Y: 0</span>
+                            </div>
+                            <!-- 조정 점 B 좌표 -->
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="flex items-center gap-1.5 text-blue-400 font-bold">
+                                    <span class="w-2.5 h-2.5 bg-blue-500 rounded-full inline-block shadow"></span> 점 B
+                                </span>
+                                <span id="coord-b" class="font-bold font-orbitron text-slate-200">X: 0, Y: 0</span>
+                            </div>
+                        </div>
+
+                        <!-- 안내 박스 -->
+                        <div class="p-3 bg-blue-950/20 text-blue-300 text-xs rounded-lg border border-blue-500/10 space-y-1">
+                            <div class="font-bold flex items-center gap-1"><i class="fa-solid fa-circle-info"></i> 조작 팁</div>
+                            <p class="leading-relaxed text-slate-400 text-[11px]" id="tip-text">
+                                화면의 빨간 점(A)과 파란 점(B)을 터치 또는 마우스로 드래그하여 목표하는 일차함수의 일치점에 위치시키세요.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- [B] 3라운드 보스전용 수식 분석 빌더 UI -->
+                    <div id="round3-ui" class="space-y-3 hidden animate-fade-in flex-1 flex flex-col justify-between">
+                        <div class="text-center space-y-1 bg-rose-950/30 p-2.5 rounded-lg border border-rose-500/20">
+                            <span class="px-2 py-0.5 bg-rose-900/80 text-rose-300 rounded text-[10px] font-bold">STAGE 3 BOSS</span>
+                            <h3 class="text-xs font-black text-slate-100">조준선 분석 모드</h3>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">레이저 궤도의 정수 좌표를 분석하세요!</p>
+                        </div>
+
+                        <!-- 3라운드 레이저 통과 좌표 수치 안내 패널 -->
+                        <div class="p-2.5 bg-[#0f101d] border border-orange-500/30 rounded-lg text-xs space-y-1 text-orange-300">
+                            <div class="font-bold text-[10px] text-slate-400 flex items-center gap-1">
+                                <i class="fa-solid fa-circle-nodes"></i> 레이저 궤도 추적 통과점
+                            </div>
+                            <div class="flex justify-between font-orbitron">
+                                <span>점 A: <strong id="r3-coord-a" class="text-white">(-3, 2)</strong></span>
+                                <span>점 B: <strong id="r3-coord-b" class="text-white">(3, -2)</strong></span>
+                            </div>
+                        </div>
+                        
+                        <!-- 완성 수식 표시 -->
+                        <div class="bg-black/50 p-2 rounded-lg text-center border border-slate-800">
+                            <span id="r3-preview-formula" class="text-lg font-bold font-orbitron text-cyan-400">y = [ ? ]x + [ ? ]</span>
+                        </div>
+
+                        <!-- 수식 형태 선택 탭 -->
+                        <div class="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-lg text-[10px] text-center">
+                            <button id="r3-tab-slope" class="py-1 rounded bg-slate-800 text-white font-bold transition-all">y = ax + b</button>
+                            <button id="r3-tab-vert" class="py-1 rounded text-slate-400 hover:text-white transition-all">x = k</button>
+                            <button id="r3-tab-horiz" class="py-1 rounded text-slate-400 hover:text-white transition-all">y = k</button>
+                        </div>
+
+                        <!-- 파라미터 선택창 (y=ax+b 형태) -->
+                        <div id="r3-panel-slope" class="space-y-2.5 text-xs">
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-1">기울기 (a) 선택</label>
+                                <div id="r3-slope-options" class="flex flex-wrap gap-1 justify-start">
+                                    <!-- JS에서 생성 -->
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-1">y절편 (b) 선택</label>
+                                <div id="r3-intercept-options" class="flex flex-wrap gap-1 justify-start">
+                                    <!-- JS에서 생성 -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 파라미터 선택창 (x=k 또는 y=k 형태) -->
+                        <div id="r3-panel-const" class="hidden space-y-2 text-xs">
+                            <div>
+                                <label id="r3-const-label" class="text-[10px] text-slate-400 block mb-1">상수값 (k) 선택</label>
+                                <div id="r3-const-options" class="flex flex-wrap gap-1 justify-start">
+                                    <!-- JS에서 생성 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 찬스 및 패스 정보 (공통) -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-slate-900/40 p-2 rounded-lg text-center border border-slate-800">
+                            <div class="text-[10px] text-slate-500 font-bold">남은 패스</div>
+                            <div id="pass-count" class="text-base font-black text-rose-400 mt-0.5">3회</div>
+                        </div>
+                        <div class="bg-slate-900/40 p-2 rounded-lg text-center border border-slate-800">
+                            <div class="text-[10px] text-slate-500 font-bold">진척 상황</div>
+                            <div id="sidebar-progress" class="text-xs font-bold text-indigo-300 mt-1">0 / 7 클리어</div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 패널 최하단: 컨트롤 버튼들 -->
+                <div class="space-y-2 pt-3 border-t border-slate-800/80">
+                    <!-- 1, 2라운드 버튼군 -->
+                    <button id="btn-pass" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-forward"></i> 이 문제 패스하기
+                    </button>
+                    <button id="btn-fire" class="w-full py-3.5 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-base rounded-xl transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2 transform active:scale-95">
+                        <i class="fa-solid fa-bolt text-lg"></i> 레이저 발사!
+                    </button>
+                    <!-- 3라운드 전용 미사일 제출 버튼 -->
+                    <button id="btn-r3-submit" class="w-full py-3.5 bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 text-white font-black text-sm rounded-xl transition-all shadow-lg active:scale-95 hidden">
+                        <i class="fa-solid fa-crosshairs mr-1"></i> 분석 미사일 격발!
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- [4] 학습 피드백 팝업 (오답 해설 및 재도전 유도) -->
+        <div id="screen-explain" class="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-6 hidden">
+            <div class="bg-[#1b1c32] rounded-2xl border border-rose-500/50 w-full max-w-2xl max-h-[90%] overflow-y-auto p-6 flex flex-col justify-between shadow-2xl">
+                <!-- 상단 헤더 -->
+                <div class="flex items-center gap-3 border-b border-slate-800 pb-3">
+                    <div class="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500 text-lg">
+                        <i class="fa-solid fa-book-open"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-rose-400">레이저 궤도 수정 학습 가이드</h2>
+                        <p class="text-xs text-slate-400">정답 궤도에서 이탈했습니다. 수식과 그래프의 원리를 먼저 학습하세요!</p>
+                    </div>
+                </div>
+
+                <!-- 해설 본문 (동적 생성) -->
+                <div id="explain-content" class="my-4 text-sm text-slate-300 space-y-4">
+                    <!-- JS에서 수식 유형별 맞춤 해설 생성 -->
+                </div>
+
+                <!-- 재도전 버튼 -->
+                <div class="border-t border-slate-800 pt-3 flex justify-end gap-3">
+                    <button id="btn-retry-solve" class="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400 text-white font-bold text-sm rounded-xl transition-all shadow-lg">
+                        원리를 이해했습니다! 다시 풀어보기
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- [5] 게임 승리 / 결과 화면 -->
+        <div id="screen-result" class="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-6 hidden">
+            <div class="text-center space-y-6 max-w-md w-full animate-fade-in">
+                <div class="w-20 h-20 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full flex items-center justify-center text-4xl mx-auto animate-bounce">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300">축하합니다!</h2>
+                    <p class="text-base font-bold text-slate-200">
+                        모든 라운드를 완벽하게 클리어했습니다!
+                    </p>
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        일차함수 그래프 분석 능력이 최정상급에 도달했습니다. 레이저 조준기를 제어하고 몬스터를 격퇴한 훌륭한 수학자입니다!
+                    </p>
+                </div>
+
+                <div class="bg-[#1e2035] p-5 rounded-xl border border-slate-700 text-left space-y-3 font-orbitron">
+                    <div class="flex justify-between items-center text-sm border-b border-slate-700/50 pb-2">
+                        <span class="text-slate-400">최종 점수:</span>
+                        <span id="result-score" class="text-xl font-black text-green-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm border-b border-slate-700/50 pb-2">
+                        <span class="text-slate-400">최고 연속 콤보:</span>
+                        <span id="result-combo" class="text-base font-bold text-amber-400">0 콤보</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">오답 극복 횟수:</span>
+                        <span id="result-retry" class="text-base font-bold text-cyan-400">0회</span>
+                    </div>
+                </div>
+
+                <button id="btn-restart" class="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-500 hover:from-cyan-500 hover:to-blue-400 text-white font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95">
+                    처음부터 다시 도전
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 스크립트 파트 -->
+    <script>
+        // 전역 상태 관리 객체
+        const state = {
+            round: 1,           
+            currentProblemNo: 1,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            passCount: 3,
+            retryCount: 0,      
+            isRetrying: false,  
+            isAnimating: false, 
+            
+            pointA: { x: -3, y: 3 },
+            pointB: { x: 3, y: -3 },
+            draggedPoint: null, 
+
+            currentProblem: null,
+            monsters: [],
+            particles: [],
+            
+            laserProgress: 0,
+            laserTargetX: 0,
+            laserTargetY: 0,
+            laserHits: [], 
+            
+            r3SelectedType: 'slope', 
+            r3Slope: '1',            
+            r3Intercept: '0',        
+            r3Const: '1',            
+
+            r1SpecialCount: 0, 
+            r2SpecialCount: 0,
+            r3SpecialCount: 0, // 3라운드 특수형식(x=k, y=k) 정답 횟수 관리
+            
+            // 이번 발사가 정말 성공적이었는지 기록하는 변수 (오동작 방지)
+            lastShotCorrect: false
+        };
+
+        // DOM 객체 바인딩
+        const DOM = {
+            introScreen: document.getElementById('screen-intro'),
+            hudRound: document.getElementById('hud-round'),
+            hudProgress: document.getElementById('hud-progress'),
+            hudCombo: document.getElementById('hud-combo'),
+            hudScore: document.getElementById('hud-score'),
+            missionFormula: document.getElementById('mission-formula'),
+            coordA: document.getElementById('coord-a'),
+            coordB: document.getElementById('coord-b'),
+            passCount: document.getElementById('pass-count'),
+            sidebarProgress: document.getElementById('sidebar-progress'),
+            tipText: document.getElementById('tip-text'),
+            
+            btnStart: document.getElementById('btn-start'),
+            btnPass: document.getElementById('btn-pass'),
+            btnFire: document.getElementById('btn-fire'),
+            
+            explainScreen: document.getElementById('screen-explain'),
+            explainContent: document.getElementById('explain-content'),
+            btnRetrySolve: document.getElementById('btn-retry-solve'),
+            
+            resultScreen: document.getElementById('screen-result'),
+            resultScore: document.getElementById('result-score'),
+            resultCombo: document.getElementById('result-combo'),
+            resultRetry: document.getElementById('result-retry'),
+            btnRestart: document.getElementById('btn-restart'),
+            
+            canvasWrapper: document.getElementById('canvas-wrapper'),
+            canvas: document.getElementById('game-canvas'),
+            comboPopup: document.getElementById('combo-popup'),
+            
+            r3UI: document.getElementById('round3-ui'),
+            normalSidebarUI: document.getElementById('normal-sidebar-ui'),
+            r3PreviewFormula: document.getElementById('r3-preview-formula'),
+            r3TabSlope: document.getElementById('r3-tab-slope'),
+            r3TabVert: document.getElementById('r3-tab-vert'),
+            r3TabHoriz: document.getElementById('r3-tab-horiz'),
+            r3PanelSlope: document.getElementById('r3-panel-slope'),
+            r3PanelConst: document.getElementById('r3-panel-const'),
+            r3SlopeOptions: document.getElementById('r3-slope-options'),
+            r3InterceptOptions: document.getElementById('r3-intercept-options'),
+            r3ConstOptions: document.getElementById('r3-const-options'),
+            r3ConstLabel: document.getElementById('r3-const-label'),
+            btnR3Submit: document.getElementById('btn-r3-submit'),
+
+            r3CoordA: document.getElementById('r3-coord-a'),
+            r3CoordB: document.getElementById('r3-coord-b')
+        };
+
+        const ctx = DOM.canvas.getContext('2d');
+        let viewScale = 1; 
+
+        const mathConstants = {
+            slopes: ["-3", "-2", "-1", "-1/2", "-1/3", "1/3", "1/2", "1", "2", "3"],
+            intercepts: ["-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5"],
+            consts: ["-5", "-4", "-3", "-2", "-1", "1", "2", "3", "4", "5"] 
+        };
+
+        window.onload = function() {
+            initEventListeners();
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        };
+
+        function resizeCanvas() {
+            const size = DOM.canvasWrapper.clientWidth;
+            DOM.canvas.width = size;
+            DOM.canvas.height = size;
+            viewScale = size / 400; 
+            drawGame();
+        }
+
+        function initEventListeners() {
+            DOM.btnStart.onclick = startGame;
+            DOM.btnRestart.onclick = restartGame;
+
+            DOM.canvas.addEventListener('mousedown', handlePointerDown);
+            DOM.canvas.addEventListener('mousemove', handlePointerMove);
+            window.addEventListener('mouseup', handlePointerUp);
+
+            DOM.canvas.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                handlePointerDown(touch);
+            }, { passive: false });
+            DOM.canvas.addEventListener('touchmove', (e) => {
+                const touch = e.touches[0];
+                handlePointerMove(touch);
+                e.preventDefault();
+            }, { passive: false });
+            window.addEventListener('touchend', handlePointerUp);
+
+            DOM.btnFire.onclick = handleFireLaser;
+            DOM.btnPass.onclick = handlePassProblem;
+            DOM.btnRetrySolve.onclick = () => {
+                DOM.explainScreen.classList.add('hidden');
+                setupCurrentProblem(); // 원래 문제를 그대로 두고 점의 원래 자석 초기 위치로 복구
+            };
+
+            DOM.r3TabSlope.onclick = () => setR3Type('slope');
+            DOM.r3TabVert.onclick = () => setR3Type('vert');
+            DOM.r3TabHoriz.onclick = () => setR3Type('horiz');
+
+            buildR3Options();
+            DOM.btnR3Submit.onclick = handleR3Submit;
+        }
+
+        function startGame() {
+            DOM.introScreen.classList.add('hidden');
+            state.round = 1;
+            state.currentProblemNo = 1;
+            state.score = 0;
+            state.combo = 0;
+            state.maxCombo = 0;
+            state.passCount = 3;
+            state.retryCount = 0;
+            state.isRetrying = false;
+            state.isAnimating = false;
+            
+            state.r1SpecialCount = 0;
+            state.r2SpecialCount = 0;
+            state.r3SpecialCount = 0; // 보스전 특수유형 카운트
+            
+            updateHUD();
+            nextProblem();
+            startAnimationLoop();
+        }
+
+        function restartGame() {
+            DOM.resultScreen.classList.add('hidden');
+            startGame();
+        }
+
+        function updateHUD() {
+            DOM.hudRound.innerText = `${state.round} / 3`;
+            DOM.hudProgress.innerText = `${state.currentProblemNo} / 7`;
+            DOM.hudCombo.innerText = `${state.combo} COMBO`;
+            DOM.hudScore.innerText = state.score;
+            DOM.passCount.innerText = `${state.passCount}회`;
+            
+            DOM.sidebarProgress.innerText = `${state.currentProblemNo - 1} / 7 클리어`;
+            
+            // 상단 미션 보드 헤더 수식 텍스트를 현재 실제 출제된 수식으로 업데이트합니다.
+            if (state.currentProblem) {
+                DOM.missionFormula.innerText = state.currentProblem.formulaText;
+            }
+            
+            if(state.round === 3) {
+                DOM.normalSidebarUI.classList.add('hidden');
+                DOM.btnFire.classList.add('hidden');
+                DOM.btnPass.classList.add('hidden');
+                
+                DOM.r3UI.classList.remove('hidden');
+                DOM.btnR3Submit.classList.remove('hidden');
+
+                if (state.pointA && state.pointB) {
+                    DOM.r3CoordA.innerText = `A(${state.pointA.x}, ${state.pointA.y})`;
+                    DOM.r3CoordB.innerText = `B(${state.pointB.x}, ${state.pointB.y})`;
+                }
+            } else {
+                DOM.normalSidebarUI.classList.remove('hidden');
+                DOM.btnFire.classList.remove('hidden');
+                DOM.btnPass.classList.remove('hidden');
+                DOM.btnPass.disabled = (state.passCount <= 0);
+                
+                DOM.r3UI.classList.add('hidden');
+                DOM.btnR3Submit.classList.add('hidden');
+            }
+        }
+
+        function nextProblem() {
+            state.isAnimating = false;
+            if (state.currentProblemNo > 7) {
+                if (state.round < 3) {
+                    state.round++;
+                    state.currentProblemNo = 1;
+                    showRoundIntroAlert();
+                    return;
+                } else {
+                    showFinalResult();
+                    return;
+                }
+            }
+
+            state.isRetrying = false;
+            generateProblemData();
+            setupCurrentProblem();
+        }
+
+        function showRoundIntroAlert() {
+            let desc = "";
+            if (state.round === 2) {
+                desc = "2라운드는 일차함수 식을 변형한 [ax + by + c = 0]의 일차방정식 꼴이 주어집니다! 모든 문제의 x절편과 y절편은 깔끔한 정수로 떨어집니다.";
+            } else if (state.round === 3) {
+                desc = "3라운드는 최종 보스전입니다! 이미 붉게 고정된 일차함수 레이저를 역분석하여 수학 공식을 우측의 키보드로 맞추는 미션입니다!";
+            }
+            
+            const alertBox = document.createElement('div');
+            alertBox.className = "absolute inset-0 bg-slate-950/90 z-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in";
+            alertBox.innerHTML = `
+                <div class="space-y-4 max-w-sm">
+                    <span class="text-xs bg-cyan-500/20 text-cyan-400 font-bold px-3 py-1 rounded-full uppercase tracking-widest font-orbitron">ROUND UP</span>
+                    <h2 class="text-3xl font-black text-white font-orbitron">ROUND ${state.round} START</h2>
+                    <p class="text-xs text-slate-400 leading-relaxed">${desc}</p>
+                    <button id="btn-alert-ok" class="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm rounded-lg transition-all shadow-lg shadow-cyan-500/10">격퇴 시작</button>
+                </div>
+            `;
+            document.getElementById('game-container').appendChild(alertBox);
+            document.getElementById('btn-alert-ok').onclick = () => {
+                alertBox.remove();
+                updateHUD();
+                nextProblem();
+            };
+        }
+
+        function generateProblemData() {
+            let formulaText = "";
+            let data = {};
+            
+            if (state.round === 1) {
+                let type;
+                if (state.r1SpecialCount >= 3) {
+                    type = 'y=ax+b'; 
+                } else {
+                    const types = ['y=ax+b', 'y=ax+b', 'x=k', 'y=k']; 
+                    type = types[Math.floor(Math.random() * types.length)];
+                }
+                
+                if (type === 'y=ax+b') {
+                    const aStr = mathConstants.slopes[Math.floor(Math.random() * mathConstants.slopes.length)];
+                    const bVal = parseInt(mathConstants.intercepts[Math.floor(Math.random() * mathConstants.intercepts.length)]);
+                    
+                    data = { type: 'y=ax+b', a: parseFraction(aStr), aStr: aStr, b: bVal };
+                    formulaText = `y = ${formatAx(aStr)}x ${formatB(bVal)}`;
+                } else if (type === 'x=k') {
+                    const kVal = parseInt(mathConstants.consts[Math.floor(Math.random() * mathConstants.consts.length)]);
+                    data = { type: 'x=k', k: kVal };
+                    formulaText = `x = ${kVal}`;
+                } else {
+                    const kVal = parseInt(mathConstants.consts[Math.floor(Math.random() * mathConstants.consts.length)]);
+                    data = { type: 'y=k', k: kVal };
+                    formulaText = `y = ${kVal}`;
+                }
+            } else if (state.round === 2) {
+                let type;
+                if (state.r2SpecialCount >= 3) {
+                    type = 'ax+by+c=0'; 
+                } else {
+                    const types = ['ax+by+c=0', 'ax+b=0', 'cy+d=0'];
+                    type = types[Math.floor(Math.random() * types.length)];
+                }
+                
+                if (type === 'ax+by+c=0') {
+                    let xIntercept = 0, yIntercept = 0;
+                    while (xIntercept === 0 || yIntercept === 0) {
+                        xIntercept = getRandomCoordExceptZero(-6, 6);
+                        yIntercept = getRandomCoordExceptZero(-6, 6);
+                    }
+                    
+                    let a = yIntercept;
+                    let b = xIntercept;
+                    let c = -(xIntercept * yIntercept);
+                    
+                    const g = gcd(Math.abs(a), Math.abs(b));
+                    a = a / g;
+                    b = b / g;
+                    c = c / g;
+                    
+                    if (a < 0) {
+                        a = -a;
+                        b = -b;
+                        c = -c;
+                    }
+
+                    const slopeVal = -a / b;
+                    
+                    data = { 
+                        type: 'ax+by+c=0', 
+                        a: a, 
+                        b: b, 
+                        c: c, 
+                        m: slopeVal, 
+                        mStr: fractionToString(-a, b), 
+                        n: yIntercept, 
+                        xInt: xIntercept, 
+                        yInt: yIntercept 
+                    };
+                    formulaText = `${formatTerm(a, 'x')} ${formatTerm(b, 'y')} ${formatC(c)} = 0`;
+                } else if (type === 'ax+b=0') {
+                    const kVal = parseInt(mathConstants.consts[Math.floor(Math.random() * mathConstants.consts.length)]);
+                    const aVal = Math.random() > 0.5 ? 2 : 1;
+                    const bVal = -aVal * kVal;
+                    data = { type: 'ax+b=0', a: aVal, b: bVal, k: kVal };
+                    formulaText = `${formatTerm(aVal, 'x')} ${formatC(bVal)} = 0`;
+                } else {
+                    const kVal = parseInt(mathConstants.consts[Math.floor(Math.random() * mathConstants.consts.length)]);
+                    const cVal = Math.random() > 0.5 ? 2 : 1;
+                    const dVal = -cVal * kVal;
+                    data = { type: 'cy+d=0', c: cVal, d: dVal, k: kVal };
+                    formulaText = `${formatTerm(cVal, 'y')} ${formatC(dVal)} = 0`;
+                }
+            } else {
+                // 3라운드 보스전도 x=k, y=k 형태의 정답 처리 횟수가 3개 이상이면 무조건 y=ax+b만 나옵니다.
+                let type;
+                if (state.r3SpecialCount >= 3) {
+                    type = 'y=ax+b';
+                } else {
+                    const types = ['y=ax+b', 'x=k', 'y=k'];
+                    type = types[Math.floor(Math.random() * types.length)];
+                }
+                
+                if (type === 'y=ax+b') {
+                    const aStr = mathConstants.slopes[Math.floor(Math.random() * mathConstants.slopes.length)];
+                    const bVal = parseInt(mathConstants.intercepts[Math.floor(Math.random() * mathConstants.intercepts.length)]);
+                    data = { type: 'y=ax+b', a: parseFraction(aStr), aStr: aStr, b: bVal };
+                    formulaText = "???";
+                } else if (type === 'x=k') {
+                    const kVal = parseInt(mathConstants.consts[Math.floor(Math.random() * mathConstants.consts.length)]);
+                    data = { type: 'x=k', k: kVal };
+                    formulaText = "???";
+                } else {
+                    const kVal = parseInt(mathConstants.consts[Math.floor(Math.random() * mathConstants.consts.length)]);
+                    data = { type: 'y=k', k: kVal };
+                    formulaText = "???";
+                }
+            }
+
+            state.currentProblem = data;
+            state.currentProblem.formulaText = formulaText;
+        }
+
+        function gcd(x, y) {
+            while (y !== 0) {
+                let temp = x % y;
+                x = y;
+                y = temp;
+            }
+            return x;
+        }
+
+        function fractionToString(num, den) {
+            let n = num;
+            let d = den;
+            if (d < 0) {
+                n = -n;
+                d = -d;
+            }
+            const g = gcd(Math.abs(n), Math.abs(d));
+            n /= g;
+            d /= g;
+            if (d === 1) return n.toString();
+            return `${n}/${d}`;
+        }
+
+        // 핵심 학습 포인트 구하기
+        function getTeachingPoints(prob) {
+            const list = [];
+            if (!prob) return list;
+
+            if (prob.type === 'y=ax+b') {
+                list.push({ x: 0, y: prob.b });
+                if (prob.aStr.includes('/')) {
+                    const parts = prob.aStr.split('/');
+                    const p = parseInt(parts[0]);
+                    const q = parseInt(parts[1]);
+                    list.push({ x: q, y: prob.b + p });
+                    list.push({ x: -q, y: prob.b - p });
+                } else {
+                    const aVal = parseInt(prob.aStr);
+                    list.push({ x: 1, y: prob.b + aVal });
+                    list.push({ x: -1, y: prob.b - aVal });
+                }
+            } else if (prob.type === 'ax+by+c=0') {
+                list.push({ x: 0, y: prob.yInt });
+                list.push({ x: prob.xInt, y: 0 });
+            } else if (prob.type === 'x=k' || prob.type === 'ax+b=0') {
+                list.push({ x: prob.k, y: -5 });
+                list.push({ x: prob.k, y: 0 });
+                list.push({ x: prob.k, y: 5 });
+            } else if (prob.type === 'y=k' || prob.type === 'cy+d=0') {
+                list.push({ x: -5, y: prob.k });
+                list.push({ x: 0, y: prob.k });
+                list.push({ x: 5, y: prob.k });
+            }
+            return list;
+        }
+
+        function isTeachingPoint(x, y, prob) {
+            const pts = getTeachingPoints(prob);
+            return pts.some(p => p.x === x && p.y === y);
+        }
+
+        function setupCurrentProblem() {
+            state.monsters = [];
+            
+            // 3라운드용 랜덤한 정수점 쌍을 정해둔 뒤, 레이저가 정확하게 그 위치를 가로지르도록 유도
+            if(state.round === 3) {
+                const pts = getTwoPointsOnLine(state.currentProblem);
+                state.pointA = pts.p1;
+                state.pointB = pts.p2;
+            }
+
+            updateHUD();
+            
+            const trueMonsterCoord = findValidIntegerPointOnLine(state.currentProblem);
+            state.monsters.push({
+                x: trueMonsterCoord.x,
+                y: trueMonsterCoord.y,
+                isReal: true,
+                spriteType: Math.floor(Math.random() * 3),
+                radius: 14,
+                alpha: 1
+            });
+
+            while(state.monsters.length < 3) {
+                const randX = getRandomCoordExceptZero(-8, 8);
+                const randY = Math.floor(Math.random() * 17) - 8; 
+
+                if (randY !== 0 && 
+                    !isPointOnLine({ x: randX, y: randY }, state.currentProblem) && 
+                    !isTeachingPoint(randX, randY, state.currentProblem) && 
+                    !state.monsters.some(m => m.x === randX && m.y === randY)) {
+                    state.monsters.push({
+                        x: randX,
+                        y: randY,
+                        isReal: false,
+                        spriteType: Math.floor(Math.random() * 3),
+                        radius: 14,
+                        alpha: 1
+                    });
+                }
+            }
+
+            state.monsters.sort(() => Math.random() - 0.5);
+
+            if (state.round !== 3) {
+                state.pointA = { x: -3, y: 5 };
+                state.pointB = { x: 4, y: -2 };
+
+                while (state.monsters.some(m => m.x === state.pointA.x && m.y === state.pointA.y) || isTeachingPoint(state.pointA.x, state.pointA.y, state.currentProblem)) {
+                    state.pointA.x += 1;
+                    if (state.pointA.x > 8) state.pointA.x = -8;
+                }
+                while (state.monsters.some(m => m.x === state.pointB.x && m.y === state.pointB.y) || 
+                       (state.pointA.x === state.pointB.x && state.pointA.y === state.pointB.y) ||
+                       isTeachingPoint(state.pointB.x, state.pointB.y, state.currentProblem)) {
+                    state.pointB.x -= 1;
+                    if (state.pointB.x < -8) state.pointB.x = 8;
+                }
+            }
+
+            updatePointsHUD();
+        }
+
+        // [버그 수정 완료] 6x-5y-30=0 과 같이 좁은 범위 내에 정수 해가 없는 경우의 오작동 예외를 처리하는 초정밀 판정 함수
+        function findValidIntegerPointOnLine(prob) {
+            const possiblePoints = [];
+            
+            if (prob.type === 'x=k' || prob.type === 'ax+b=0') {
+                const x = prob.k;
+                if (x !== 0) { 
+                    for (let y = -8; y <= 8; y++) {
+                        if (y !== 0 && !isTeachingPoint(x, y, prob)) { 
+                            possiblePoints.push({ x: x, y: y });
+                        }
+                    }
+                }
+            } else if (prob.type === 'ax+by+c=0') {
+                // 1단계 패스: [-8, 8] 범위의 일반 비절편 정수점 찾기
+                for (let x = -8; x <= 8; x++) {
+                    if (x === 0 || x === prob.xInt) continue; 
+                    const y = getYFromLine(x, prob);
+                    if (Number.isInteger(y) && y >= -8 && y <= 8 && y !== 0 && y !== prob.yInt && !isTeachingPoint(x, y, prob)) {
+                        possiblePoints.push({ x: x, y: y });
+                    }
+                }
+                // 2단계 패스: 존재하지 않을 경우 범위를 [-10, 10] 전체 격자로 넓혀서 비절편 정수점 찾기
+                if (possiblePoints.length === 0) {
+                    for (let x = -10; x <= 10; x++) {
+                        if (x === 0 || x === prob.xInt) continue;
+                        const y = getYFromLine(x, prob);
+                        if (Number.isInteger(y) && y >= -10 && y <= 10 && y !== 0 && y !== prob.yInt) {
+                            possiblePoints.push({ x: x, y: y });
+                        }
+                    }
+                }
+                // 3단계 패스: 어떠한 정수 조합도 전혀 나오지 않는 고난도 직선의 경우, 수학적 오류를 방지하기 위해 절편 자체를 몬스터 좌표로 허용
+                if (possiblePoints.length === 0) {
+                    possiblePoints.push({ x: prob.xInt, y: 0 });
+                    possiblePoints.push({ x: 0, y: prob.yInt });
+                }
+            } else {
+                for (let x = -8; x <= 8; x++) {
+                    if (x === 0) continue; 
+                    const y = getYFromLine(x, prob);
+                    if (Number.isInteger(y) && y >= -8 && y <= 8 && y !== 0 && !isTeachingPoint(x, y, prob)) {
+                        possiblePoints.push({ x: x, y: y });
+                    }
+                }
+                // y = ax + b 계열 2단계 패스 (최외각 탐색 범위 확장)
+                if (possiblePoints.length === 0) {
+                    for (let x = -10; x <= 10; x++) {
+                        const y = getYFromLine(x, prob);
+                        if (Number.isInteger(y) && y >= -10 && y <= 10) {
+                            possiblePoints.push({ x: x, y: y });
+                        }
+                    }
+                }
+            }
+
+            if (possiblePoints.length > 0) {
+                return possiblePoints[Math.floor(Math.random() * possiblePoints.length)];
+            }
+            
+            // 삼중 절대 예외 안전장치 (오류로 몬스터가 직선을 이탈하는 것을 원천 봉쇄)
+            if (prob.type === 'y=ax+b') {
+                return { x: 0, y: prob.b };
+            } else if (prob.type === 'x=k' || prob.type === 'ax+b=0') {
+                return { x: prob.k, y: 2 };
+            } else if (prob.type === 'y=k' || prob.type === 'cy+d=0') {
+                return { x: 2, y: prob.k };
+            } else if (prob.type === 'ax+by+c=0') {
+                return { x: prob.xInt, y: 0 };
+            }
+            return { x: 3, y: 3 };
+        }
+
+        function getYFromLine(x, prob) {
+            if (prob.type === 'y=ax+b') {
+                return prob.a * x + prob.b;
+            } else if (prob.type === 'x=k' || prob.type === 'ax+b=0') {
+                return 4; 
+            } else if (prob.type === 'y=k' || prob.type === 'cy+d=0') {
+                return prob.k;
+            } else if (prob.type === 'ax+by+c=0') {
+                return (-prob.a * x - prob.c) / prob.b;
+            }
+            return 0;
+        }
+
+        function isPointOnLine(pt, prob) {
+            if (prob.type === 'y=ax+b') {
+                return Math.abs(pt.y - (prob.a * pt.x + prob.b)) < 0.01;
+            } else if (prob.type === 'x=k' || prob.type === 'ax+b=0') {
+                return pt.x === prob.k;
+            } else if (prob.type === 'y=k' || prob.type === 'cy+d=0') {
+                return pt.y === prob.k;
+            } else if (prob.type === 'ax+by+c=0') {
+                return Math.abs(prob.a * pt.x + prob.b * pt.y + prob.c) < 0.01;
+            }
+            return false;
+        }
+
+        function getTwoPointsOnLine(prob) {
+            const pts = [];
+            if (prob.type === 'x=k' || prob.type === 'ax+b=0') {
+                pts.push({ x: prob.k, y: -5 });
+                pts.push({ x: prob.k, y: 5 });
+            } else if (prob.type === 'y=k' || prob.type === 'cy+d=0') {
+                pts.push({ x: -5, y: prob.k });
+                pts.push({ x: 5, y: prob.k });
+            } else {
+                for (let x = -8; x <= 8; x++) {
+                    const y = getYFromLine(x, prob);
+                    if (Number.isInteger(y) && y >= -8 && y <= 8) {
+                        pts.push({ x: x, y: y });
+                    }
+                }
+            }
+            
+            if (pts.length >= 2) {
+                const midIdx = Math.floor(pts.length / 2);
+                const p1 = pts[Math.max(0, midIdx - 2)];
+                const p2 = pts[Math.min(pts.length - 1, midIdx + 2)];
+                return { p1: p1, p2: p2 };
+            }
+            return { p1: { x: -2, y: -2 }, p2: { x: 2, y: 2 } };
+        }
+
+        function handlePointerDown(e) {
+            if (state.isAnimating || state.round === 3) return;
+            
+            const rect = DOM.canvas.getBoundingClientRect();
+            const clientX = e.clientX - rect.left;
+            const clientY = e.clientY - rect.top;
+
+            const canvasX = clientX / viewScale;
+            const canvasY = clientY / viewScale;
+
+            const pixelA = mathToCanvas(state.pointA.x, state.pointA.y);
+            const pixelB = mathToCanvas(state.pointB.x, state.pointB.y);
+
+            const distA = Math.hypot(canvasX - pixelA.x, canvasY - pixelA.y);
+            const distB = Math.hypot(canvasX - pixelB.x, canvasY - pixelB.y);
+
+            if (distA < 30 && distA < distB) {
+                state.draggedPoint = 'A';
+            } else if (distB < 30) {
+                state.draggedPoint = 'B';
+            }
+        }
+
+        // 마우스 및 터치 드래그로 조준기 이동
+        function handlePointerMove(e) {
+            if (!state.draggedPoint || state.isAnimating) return;
+
+            const rect = DOM.canvas.getBoundingClientRect();
+            const clientX = e.clientX - rect.left;
+            const clientY = e.clientY - rect.top;
+
+            const canvasX = clientX / viewScale;
+            const canvasY = clientY / viewScale;
+
+            const mathPt = canvasToMath(canvasX, canvasY);
+
+            let targetX = Math.round(mathPt.x);
+            let targetY = Math.round(mathPt.y);
+
+            targetX = Math.max(-10, Math.min(10, targetX));
+            targetY = Math.max(-10, Math.min(10, targetY));
+
+            const isOverMonster = state.monsters.some(m => m.x === targetX && m.y === targetY);
+            if (isOverMonster) {
+                return; 
+            }
+
+            if (state.draggedPoint === 'A') {
+                if (targetX !== state.pointB.x || targetY !== state.pointB.y) {
+                    state.pointA = { x: targetX, y: targetY };
+                }
+            } else if (state.draggedPoint === 'B') {
+                if (targetX !== state.pointA.x || targetY !== state.pointA.y) {
+                    state.pointB = { x: targetX, y: targetY };
+                }
+            }
+
+            updatePointsHUD();
+        }
+
+        function handlePointerUp() {
+            state.draggedPoint = null;
+        }
+
+        function updatePointsHUD() {
+            DOM.coordA.innerText = `X: ${state.pointA.x}, Y: ${state.pointA.y}`;
+            DOM.coordB.innerText = `X: ${state.pointB.x}, Y: ${state.pointB.y}`;
+        }
+
+        // 수학적 가상 좌표를 실제 캔버스 상의 픽셀 위치로 변환 (눈금 간격을 16px로 매핑)
+        function mathToCanvas(mx, my) {
+            const cx = 200 + mx * 16;
+            const cy = 200 - my * 16;
+            return { x: cx, y: cy };
+        }
+
+        function canvasToMath(cx, cy) {
+            const mx = (cx - 200) / 16;
+            const my = (200 - cy) / 16;
+            return { x: mx, y: my };
+        }
+
+        function buildR3Options() {
+            DOM.r3SlopeOptions.innerHTML = '';
+            mathConstants.slopes.forEach(slope => {
+                const btn = document.createElement('button');
+                btn.className = "px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] font-bold font-orbitron rounded transition-all r3-slope-btn";
+                btn.innerText = slope;
+                btn.onclick = () => {
+                    document.querySelectorAll('.r3-slope-btn').forEach(b => b.classList.remove('bg-rose-600', 'text-white'));
+                    btn.classList.add('bg-rose-600', 'text-white');
+                    state.r3Slope = slope;
+                    updateR3Preview();
+                };
+                DOM.r3SlopeOptions.appendChild(btn);
+            });
+
+            DOM.r3InterceptOptions.innerHTML = '';
+            mathConstants.intercepts.forEach(inter => {
+                const btn = document.createElement('button');
+                btn.className = "px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] font-bold font-orbitron rounded transition-all r3-inter-btn";
+                btn.innerText = inter;
+                btn.onclick = () => {
+                    document.querySelectorAll('.r3-inter-btn').forEach(b => b.classList.remove('bg-rose-600', 'text-white'));
+                    btn.classList.add('bg-rose-600', 'text-white');
+                    state.r3Intercept = inter;
+                    updateR3Preview();
+                };
+                DOM.r3InterceptOptions.appendChild(btn);
+            });
+
+            DOM.r3ConstOptions.innerHTML = '';
+            mathConstants.consts.forEach(cVal => {
+                const btn = document.createElement('button');
+                btn.className = "px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] font-bold font-orbitron rounded transition-all r3-const-btn";
+                btn.innerText = cVal;
+                btn.onclick = () => {
+                    document.querySelectorAll('.r3-const-btn').forEach(b => b.classList.remove('bg-rose-600', 'text-white'));
+                    btn.classList.add('bg-rose-600', 'text-white');
+                    state.r3Const = cVal;
+                    updateR3Preview();
+                };
+                DOM.r3ConstOptions.appendChild(btn);
+            });
+        }
+
+        function setR3Type(type) {
+            state.r3SelectedType = type;
+            
+            [DOM.r3TabSlope, DOM.r3TabVert, DOM.r3TabHoriz].forEach(el => el.className = "py-1 rounded text-slate-400 hover:text-white transition-all");
+            if (type === 'slope') {
+                DOM.r3TabSlope.className = "py-1 rounded bg-slate-800 text-rose-400 font-bold transition-all";
+                DOM.r3PanelSlope.classList.remove('hidden');
+                DOM.r3PanelConst.classList.add('hidden');
+            } else if (type === 'vert') {
+                DOM.r3TabVert.className = "py-1 rounded bg-slate-800 text-rose-400 font-bold transition-all";
+                DOM.r3PanelSlope.classList.add('hidden');
+                DOM.r3PanelConst.classList.remove('hidden');
+                DOM.r3ConstLabel.innerText = "상수 x값 (k) 선택";
+            } else if (type === 'horiz') {
+                DOM.r3TabHoriz.className = "py-1 rounded bg-slate-800 text-rose-400 font-bold transition-all";
+                DOM.r3PanelSlope.classList.add('hidden');
+                DOM.r3PanelConst.classList.remove('hidden');
+                DOM.r3ConstLabel.innerText = "상수 y값 (k) 선택";
+            }
+            updateR3Preview();
+        }
+
+        function resetR3UI() {
+            state.r3Slope = '1';
+            state.r3Intercept = '0';
+            state.r3Const = '1';
+            setR3Type('slope');
+            
+            document.querySelectorAll('.r3-slope-btn, .r3-inter-btn, .r3-const-btn').forEach(btn => {
+                btn.classList.remove('bg-rose-600', 'text-white');
+                if (btn.innerText === '1' || btn.innerText === '0') {
+                    btn.classList.add('bg-rose-600', 'text-white');
+                }
+            });
+            updateR3Preview();
+        }
+
+        function updateR3Preview() {
+            if (state.r3SelectedType === 'slope') {
+                DOM.r3PreviewFormula.innerText = `y = ${formatAx(state.r3Slope)}x ${formatB(parseInt(state.r3Intercept))}`;
+            } else if (state.r3SelectedType === 'vert') {
+                DOM.r3PreviewFormula.innerText = `x = ${state.r3Const}`;
+            } else {
+                DOM.r3PreviewFormula.innerText = `y = ${state.r3Const}`;
+            }
+        }
+
+        function parseFraction(str) {
+            if (str.includes('/')) {
+                const parts = str.split('/');
+                return parseInt(parts[0]) / parseInt(parts[1]);
+            }
+            return parseInt(str);
+        }
+
+        function handleFireLaser() {
+            if (state.isAnimating) return;
+
+            const p1 = state.pointA;
+            const p2 = state.pointB;
+
+            if (p1.x === p2.x && p1.y === p2.y) {
+                return;
+            }
+
+            state.isAnimating = true;
+            state.laserProgress = 0;
+            state.laserHits = [];
+
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+
+            state.monsters.forEach((monster, idx) => {
+                let hit = false;
+                if (dx === 0) {
+                    if (monster.x === p1.x) hit = true;
+                } else {
+                    const val = dy * (monster.x - p1.x) - dx * (monster.y - p1.y);
+                    if (Math.abs(val) < 0.001) {
+                        hit = true;
+                    }
+                }
+
+                if (hit) {
+                    state.laserHits.push(idx);
+                }
+            });
+
+            const hitReal = state.laserHits.some(idx => state.monsters[idx].isReal);
+            const userFormulaMatch = verifyUserLaserFormula();
+
+            // 물리적으로 몬스터를 맞추었더라도 수식이 완전 일치해야만 격파가 작동하도록 제어
+            if (hitReal && userFormulaMatch) {
+                state.lastShotCorrect = true;
+                handleCorrectAnswer();
+            } else {
+                state.lastShotCorrect = false;
+                handleWrongAnswer();
+            }
+        }
+
+        function verifyUserLaserFormula() {
+            const p1 = state.pointA;
+            const p2 = state.pointB;
+            const prob = state.currentProblem;
+
+            if (prob.type === 'x=k' || prob.type === 'ax+b=0') {
+                return (p1.x === prob.k && p2.x === prob.k);
+            } else if (prob.type === 'y=k' || prob.type === 'cy+d=0') {
+                return (p1.y === prob.k && p2.y === prob.k);
+            } else if (prob.type === 'y=ax+b' || prob.type === 'ax+by+c=0') {
+                const dx = p2.x - p1.x;
+                if (dx === 0) return false;
+                
+                const userSlope = (p2.y - p1.y) / dx;
+                const userIntercept = p1.y - userSlope * p1.x;
+
+                const targetSlope = (prob.type === 'y=ax+b') ? prob.a : prob.m;
+                const targetIntercept = (prob.type === 'y=ax+b') ? prob.b : prob.n;
+
+                return Math.abs(userSlope - targetSlope) < 0.001 && Math.abs(userIntercept - targetIntercept) < 0.001;
+            }
+            return false;
+        }
+
+        function handleR3Submit() {
+            if (state.isAnimating) return;
+
+            let userProb = {};
+            if (state.r3SelectedType === 'slope') {
+                userProb = { type: 'y=ax+b', a: parseFraction(state.r3Slope), b: parseInt(state.r3Intercept) };
+            } else if (state.r3SelectedType === 'vert') {
+                userProb = { type: 'x=k', k: parseInt(state.r3Const) };
+            } else {
+                userProb = { type: 'y=k', k: parseInt(state.r3Const) };
+            }
+
+            const target = state.currentProblem;
+            let isCorrect = false;
+
+            if (target.type === 'y=ax+b' && userProb.type === 'y=ax+b') {
+                isCorrect = (Math.abs(target.a - userProb.a) < 0.001 && target.b === userProb.b);
+            } else if (target.type === 'x=k' && userProb.type === 'x=k') {
+                isCorrect = (target.k === userProb.k);
+            } else if (target.type === 'y=k' && userProb.type === 'y=k') {
+                isCorrect = (target.k === userProb.k);
+            }
+
+            state.isAnimating = true;
+            state.laserProgress = 0;
+            state.laserHits = [];
+
+            if (isCorrect) {
+                state.monsters.forEach((m, idx) => {
+                    if (m.isReal) state.laserHits.push(idx);
+                });
+                state.lastShotCorrect = true;
+                handleCorrectAnswer();
+            } else {
+                state.lastShotCorrect = false;
+                handleWrongAnswer();
+            }
+        }
+
+        function handleCorrectAnswer() {
+            let popupText = "";
+
+            if (!state.isRetrying) {
+                state.combo++;
+                if (state.combo > state.maxCombo) {
+                    state.maxCombo = state.combo;
+                }
+
+                const comboBonus = (state.combo - 1) * 20;
+                const pointsAdded = 100 + comboBonus;
+                state.score += pointsAdded;
+
+                if (state.combo > 1) {
+                    popupText = `${state.combo} 콤보!<br><span class="text-2xl text-emerald-400 font-black font-orbitron">+${pointsAdded}점</span>`;
+                } else {
+                    popupText = `<span class="text-2xl text-emerald-400 font-black font-orbitron">+${pointsAdded}점</span>`;
+                }
+            } else {
+                // 오답 재시도로 풀었을 땐 점수와 콤보 획득을 제한하여 공정성 보장
+                popupText = `<span class="text-xl text-cyan-400 font-black">오답 극복 성공!</span><br><span class="text-sm text-slate-300">개념 복습 완료</span>`;
+            }
+
+            DOM.comboPopup.innerHTML = popupText;
+            DOM.comboPopup.classList.remove('opacity-0', 'scale-90');
+            DOM.comboPopup.classList.add('opacity-100', 'scale-110');
+            
+            setTimeout(() => {
+                DOM.comboPopup.classList.remove('opacity-100', 'scale-110');
+                DOM.comboPopup.classList.add('opacity-0', 'scale-90');
+            }, 1200);
+
+            if (!state.isRetrying) {
+                const currentType = state.currentProblem.type;
+                if (state.round === 1 && (currentType === 'x=k' || currentType === 'y=k')) {
+                    state.r1SpecialCount++;
+                } else if (state.round === 2 && (currentType === 'ax+b=0' || currentType === 'cy+d=0')) {
+                    state.r2SpecialCount++;
+                } else if (state.round === 3 && (currentType === 'x=k' || currentType === 'y=k')) {
+                    // [추가] 3라운드 보스전에서 특수 형태 클리어 카운트를 실시간으로 기록합니다.
+                    state.r3SpecialCount++;
+                }
+
+                setTimeout(() => {
+                    state.currentProblemNo++;
+                    updateHUD();
+                }, 1500);
+            } else {
+                state.retryCount++;
+            }
+        }
+
+        function handleWrongAnswer() {
+            state.combo = 0;
+            updateHUD();
+
+            setTimeout(() => {
+                showMathExplanation();
+            }, 1800);
+        }
+
+        function showMathExplanation() {
+            const prob = state.currentProblem;
+            let explanationHTML = "";
+
+            let slopeExplanation = "";
+            const currentSlopeStr = prob.aStr || (prob.mStr || "1");
+
+            if (currentSlopeStr.includes('/')) {
+                const parts = currentSlopeStr.split('/');
+                const num = parseInt(parts[0]);
+                const den = parseInt(parts[1]);
+                if (num < 0) {
+                    slopeExplanation = `기울기가 <strong class="text-rose-400">${currentSlopeStr}</strong>이므로, x축 방향으로 <strong class="text-cyan-400">${den}칸 오른쪽으로</strong> 이동할 때, y축 방향으로는 <strong class="text-rose-400">아래로 ${Math.abs(num)}칸</strong> 내려가야 합니다.`;
+                } else {
+                    slopeExplanation = `기울기가 <strong class="text-rose-400">${currentSlopeStr}</strong>이므로, x축 방향으로 <strong class="text-cyan-400">${den}칸 오른쪽으로</strong> 이동할 때, y축 방향으로는 <strong class="text-emerald-400">위로 ${num}칸</strong> 올라가야 합니다.`;
+                }
+            } else {
+                const val = parseFloat(currentSlopeStr);
+                if (val < 0) {
+                    slopeExplanation = `기울기가 <strong class="text-rose-400">${currentSlopeStr}</strong>이므로, x축 방향으로 <strong class="text-cyan-400">1칸 오른쪽으로</strong> 이동할 때, y축 방향으로는 <strong class="text-rose-400">아래로 ${Math.abs(val)}칸</strong> 내려가야 합니다.`;
+                } else {
+                    slopeExplanation = `기울기가 <strong class="text-rose-400">${currentSlopeStr}</strong>이므로, x축 방향으로 <strong class="text-cyan-400">1칸 오른쪽으로</strong> 이동할 때, y축 방향으로는 <strong class="text-emerald-400">위로 ${val}칸</strong> 올라가야 합니다.`;
+                }
+            }
+
+            if (prob.type === 'y=ax+b') {
+                explanationHTML = `
+                    <div class="space-y-3">
+                        <p class="text-white">틀린 문제는 <strong>일차함수 $y = ax + b$</strong>의 형태입니다. 차근차근 다시 알아봅시다.</p>
+                        <div class="bg-slate-900/60 p-4 rounded-xl space-y-3 border border-slate-700">
+                            <h4 class="text-emerald-400 font-bold"><i class="fa-solid fa-graduation-cap"></i> 수식 완전 분해:</h4>
+                            <p class="text-xs text-slate-300">현재 목표 수식: <span class="text-amber-300 font-bold font-orbitron">y = ${formatAx(prob.aStr)}x ${formatB(prob.b)}</span></p>
+                            <ul class="list-disc list-inside text-xs text-slate-400 space-y-2.5 pl-1 leading-relaxed">
+                                <li><strong class="text-cyan-400">y절편 (y-intercept)은 뒤의 상수값 $b$입니다. 즉, <span class="text-rose-400">${prob.b}</span>입니다.</strong><br>
+                                    그래프가 y축과 만나는 지점은 항상 <strong class="text-white">(0, ${prob.b})</strong>가 되어야 하므로 조정 점 하나를 우선 이곳에 맞추세요!</li>
+                                <li><strong class="text-cyan-400">기울기 (Slope)는 x 앞의 계수 $a$입니다. 즉, <span class="text-rose-400">${prob.aStr}</span>입니다.</strong><br>
+                                    기울기는 <strong class="text-white">$\frac{\text{y의 증가량}}{\text{x의 증가량}}$</strong>입니다.<br>
+                                    👉 <span class="text-white">${slopeExplanation}</span></li>
+                            </ul>
+                        </div>
+                        <p class="text-xs text-slate-400">💡 <strong>해결 순서:</strong> <br>1단계: <strong class="text-white">(0, ${prob.b})</strong> 지점에 점 A를 놓는다.<br>2단계: 그 점으로부터 기울기 조건만큼(예: ${currentSlopeStr}에 맞추어) 이동한 위치에 점 B를 놓는다.</p>
+                    </div>
+                `;
+            } else if (prob.type === 'x=k' || prob.type === 'ax+b=0') {
+                const k = prob.k;
+                explanationHTML = `
+                    <div class="space-y-3">
+                        <p class="text-white">틀린 문제는 <strong>축에 평행한 직선인 $x = k$</strong> 형태입니다.</p>
+                        <div class="bg-slate-900/60 p-4 rounded-xl space-y-2 border border-slate-700">
+                            <h4 class="text-emerald-400 font-bold"><i class="fa-solid fa-graduation-cap"></i> 축 평행 공식의 원리:</h4>
+                            <p class="text-xs text-slate-300">현재 목표 수식: <span class="text-amber-300 font-bold font-orbitron">${prob.type === 'ax+b=0' ? `${prob.a}x + ${prob.b} = 0 ` : ''} (즉, x = ${k})</span></p>
+                            <ul class="list-disc list-inside text-xs text-slate-400 space-y-1.5 pl-1 leading-relaxed">
+                                <li>$x = k$ 형태의 식은 <strong>y의 값에 관계없이 항상 x의 좌표가 $k$로 고정</strong>됨을 뜻합니다.</li>
+                                <li>이 그래프는 <strong class="text-cyan-400">y축에 평행하고, x축에 수직인 수직선(세로선)</strong>이 됩니다.</li>
+                                <li>따라서 조정 점 A와 B의 <strong class="text-rose-400">x 좌표를 모두 ${k}</strong>로 맞추면 똑바른 세로선 조준이 완성됩니다.</li>
+                            </ul>
+                        </div>
+                        <p class="text-xs text-slate-400">💡 <strong>해결 순서:</strong> 두 조정 점의 X좌표를 모두 동일하게 <strong class="text-white">${k}</strong>로 설정하여 완벽한 세로선을 가로지르세요.</p>
+                    </div>
+                `;
+            } else if (prob.type === 'y=k' || prob.type === 'cy+d=0') {
+                const k = prob.k;
+                explanationHTML = `
+                    <div class="space-y-3">
+                        <p class="text-white">틀린 문제는 <strong>축에 평행한 직선인 $y = k$</strong> 형태입니다.</p>
+                        <div class="bg-slate-900/60 p-4 rounded-xl space-y-2 border border-slate-700">
+                            <h4 class="text-emerald-400 font-bold"><i class="fa-solid fa-graduation-cap"></i> 축 평행 공식의 원리:</h4>
+                            <p class="text-xs text-slate-300">현재 목표 수식: <span class="text-amber-300 font-bold font-orbitron">${prob.type === 'cy+d=0' ? `${prob.c}y + ${prob.d} = 0 ` : ''} (즉, y = ${k})</span></p>
+                            <ul class="list-disc list-inside text-xs text-slate-400 space-y-1.5 pl-1 leading-relaxed">
+                                <li>$y = k$ 형태의 식은 <strong>x의 값에 관계없이 항상 y의 좌표가 $k$로 고정</strong>됨을 뜻합니다.</li>
+                                <li>이 그래프는 <strong class="text-cyan-400">x축에 평행하고, y축에 수직인 수평선(가로선)</strong>이 됩니다.</li>
+                                <li>따라서 조정 점 A와 B의 <strong class="text-rose-400">y 좌표를 모두 ${k}</strong>로 맞추면 똑바른 가로선 조준이 완성됩니다.</li>
+                            </ul>
+                        </div>
+                        <p class="text-xs text-slate-400">💡 <strong>해결 순서:</strong> 두 조정 점의 Y좌표를 모두 동일하게 <strong class="text-white">${k}</strong>로 설정하여 완벽한 가로선을 가로지르세요.</p>
+                    </div>
+                `;
+            } else if (prob.type === 'ax+by+c=0') {
+                explanationHTML = `
+                    <div class="space-y-4">
+                        <p class="text-white">틀린 문제는 <strong>미지수가 2개인 일차방정식 $ax + by + c = 0$</strong> 형태입니다. 이 그래프를 조준하기 위한 <strong class="text-yellow-400">두 가지 필살 노하우</strong>를 마스터해봅시다!</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- 노하우 ①: 일차함수식 변형법 -->
+                            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700 space-y-2.5">
+                                <h4 class="text-cyan-400 font-bold text-sm flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs">1</span>
+                                    일차함수식으로 변형하기
+                                </h4>
+                                <p class="text-xs text-slate-300">주어진 식을 <strong class="text-white">$by = -ax - c$</strong> 즉, <strong class="text-white">$y = -\\frac{a}{b}x - \\frac{c}{b}$</strong> 꼴로 고칩니다.</p>
+                                <div class="p-2.5 bg-black/40 rounded-lg text-center border border-slate-800 text-xs">
+                                    <span class="text-amber-300 font-bold">${prob.a}x ${prob.b >= 0 ? '+' : ''}${prob.b}y ${prob.c >= 0 ? '+' : ''}${prob.c} = 0</span><br>
+                                    <span class="text-slate-400">↕ 변형하면</span><br>
+                                    <span class="text-emerald-400 font-bold font-orbitron">y = ${formatAx(currentSlopeStr)}x ${formatB(prob.yInt)}</span>
+                                </div>
+                                <ul class="list-disc list-inside text-[11px] text-slate-400 space-y-1 pl-1 leading-relaxed">
+                                    <li><strong>y절편:</strong> y축 위의 점 <strong class="text-white">(0, ${prob.yInt})</strong>에 점 A를 놓는다.</li>
+                                    <li><strong>기울기 적용:</strong> ${slopeExplanation} 이 조건대로 점 B를 안착시킨다.</li>
+                                </ul>
+                            </div>
+
+                            <!-- 노하우 ②: x절편, y절편 구하기 -->
+                            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700 space-y-2.5">
+                                <h4 class="text-purple-400 font-bold text-sm flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs">2</span>
+                                    x절편과 y절편 찍고 잇기
+                                </h4>
+                                <p class="text-xs text-slate-300">계산이 훨씬 간편한 정수 절편 두 개를 찾아 점을 찍고 다이렉트로 잇는 방법입니다.</p>
+                                <div class="space-y-1.5">
+                                    <div class="p-2 bg-black/40 rounded-lg flex justify-between items-center text-xs">
+                                        <span class="text-slate-400">① <strong class="text-white">x절편</strong> ($y=0$ 대입)</span>
+                                        <span class="text-cyan-400 font-black font-orbitron">x = ${prob.xInt} &nbsp; ➔ &nbsp; (${prob.xInt}, 0)</span>
+                                    </div>
+                                    <div class="p-2 bg-black/40 rounded-lg flex justify-between items-center text-xs">
+                                        <span class="text-slate-400">② <strong class="text-white">y절편</strong> ($x=0$ 대입)</span>
+                                        <span class="text-purple-400 font-black font-orbitron">y = ${prob.yInt} &nbsp; ➔ &nbsp; (0, ${prob.yInt})</span>
+                                    </div>
+                                </div>
+                                <p class="text-[11px] text-slate-400 leading-relaxed pt-1">
+                                    👉 <strong>가장 빠른 조준법:</strong><br>
+                                    좌표평면 위에서 x축의 <strong class="text-white">${prob.xInt}</strong>에 점 A를 놓고, y축의 <strong class="text-white">${prob.yInt}</strong>에 점 B를 놓으면 단 5초 만에 정확한 조준선이 완성됩니다!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            DOM.explainContent.innerHTML = explanationHTML;
+            state.isRetrying = true;
+            DOM.explainScreen.classList.remove('hidden');
+        }
+
+        function handlePassProblem() {
+            if (state.passCount > 0 && state.round !== 3) {
+                state.passCount--;
+                state.combo = 0;
+                nextProblem();
+            }
+        }
+
+        function showFinalResult() {
+            DOM.resultScreen.classList.remove('hidden');
+            DOM.resultScore.innerText = state.score;
+            DOM.resultCombo.innerText = `${state.maxCombo} 콤보`;
+            DOM.resultRetry.innerText = `${state.retryCount}회`;
+        }
+
+        function getRandomCoordExceptZero(min, max) {
+            let val = 0;
+            while (val === 0) {
+                val = Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+            return val;
+        }
+
+        // 수식 문자 정제 기능
+        function formatAx(aStr) {
+            if (aStr === "1") return "";
+            if (aStr === "-1") return "-";
+            return aStr;
+        }
+        function formatB(bVal) {
+            if (bVal === 0) return "";
+            return bVal > 0 ? `+ ${bVal}` : `- ${Math.abs(bVal)}`;
+        }
+        function formatC(cVal) {
+            if (cVal === 0) return "";
+            return cVal > 0 ? `+ ${cVal}` : `- ${Math.abs(cVal)}`;
+        }
+        function formatTerm(coeff, char) {
+            if (coeff === 0) return "";
+            if (coeff === 1) return `+ ${char}`;
+            if (coeff === -1) return `- ${char}`;
+            return coeff > 0 ? `+ ${coeff}${char}` : `- ${Math.abs(coeff)}${char}`;
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 25; i++) {
+                state.particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    color: color,
+                    size: Math.random() * 3 + 2,
+                    alpha: 1,
+                    life: 1.0
+                });
+            }
+        }
+
+        let animFrameId;
+        function startAnimationLoop() {
+            if (animFrameId) cancelAnimationFrame(animFrameId);
+            function loop() {
+                updateParticles();
+                drawGame();
+                animFrameId = requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        function updateParticles() {
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                const p = state.particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+                p.life -= 0.03;
+                if (p.alpha <= 0) {
+                    state.particles.splice(i, 1);
+                }
+            }
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height);
+            ctx.save();
+            ctx.scale(viewScale, viewScale);
+
+            drawGrid();
+
+            if (state.round === 3 || state.isAnimating) {
+                drawTargetLaserLine();
+            }
+
+            drawMonsters();
+
+            if (state.isAnimating) {
+                drawLaserAnimation();
+            }
+
+            drawParticles();
+
+            if (state.round !== 3) {
+                drawControlPoints();
+            } else {
+                drawR3TargetNodes();
+            }
+
+            ctx.restore();
+        }
+
+        function drawGrid() {
+            ctx.fillStyle = '#06070d';
+            ctx.fillRect(0, 0, 400, 400);
+
+            ctx.lineWidth = 0.5;
+            for (let i = -10; i <= 10; i++) {
+                const ptX1 = mathToCanvas(i, -10);
+                const ptX2 = mathToCanvas(i, 10);
+                const ptY1 = mathToCanvas(-10, i);
+                const ptY2 = mathToCanvas(10, i);
+
+                if (i === 0) {
+                    ctx.strokeStyle = '#3f426b';
+                    ctx.lineWidth = 1.8;
+                } else {
+                    ctx.strokeStyle = '#1a1c32';
+                    ctx.lineWidth = 0.5;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(ptX1.x, ptX1.y);
+                ctx.lineTo(ptX2.x, ptX2.y);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(ptY1.x, ptY1.y);
+                ctx.lineTo(ptY2.x, ptY2.y);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#64748b';
+            ctx.font = '7px Orbitron, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let i = -10; i <= 10; i += 2) {
+                if (i === 0) continue;
+                const px = mathToCanvas(i, 0);
+                ctx.fillText(i, px.x, px.y + 10);
+                const py = mathToCanvas(0, i);
+                ctx.fillText(i, py.x - 10, py.y);
+            }
+            const origin = mathToCanvas(0,0);
+            ctx.fillText('O', origin.x - 8, origin.y + 8);
+        }
+
+        function drawTargetLaserLine() {
+            const p1 = mathToCanvas(state.pointA.x, state.pointA.y);
+            const p2 = mathToCanvas(state.pointB.x, state.pointB.y);
+
+            const ext = getExtendedCoordinates(p1.x, p1.y, p2.x, p2.y);
+
+            ctx.save();
+            ctx.strokeStyle = state.round === 3 ? 'rgba(244, 63, 94, 0.7)' : 'rgba(34, 211, 238, 0.55)';
+            ctx.lineWidth = 3.5;
+            ctx.shadowColor = state.round === 3 ? 'rgb(244, 63, 94)' : 'rgb(34, 211, 238)';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(ext.x1, ext.y1);
+            ctx.lineTo(ext.x2, ext.y2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawR3TargetNodes() {
+            const nodes = [state.pointA, state.pointB];
+            nodes.forEach((node, idx) => {
+                const pos = mathToCanvas(node.x, node.y);
+                ctx.save();
+                
+                ctx.strokeStyle = '#f97316';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(pos.x - 9, pos.y);
+                ctx.lineTo(pos.x + 9, pos.y);
+                ctx.moveTo(pos.x, pos.y - 9);
+                ctx.lineTo(pos.x, pos.y + 9);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '9px Orbitron, sans-serif';
+                ctx.fillText(idx === 0 ? 'A' : 'B', pos.x + 13, pos.y - 4);
+                
+                ctx.restore();
+            });
+        }
+
+        function drawMonsters() {
+            state.monsters.forEach(m => {
+                const pos = mathToCanvas(m.x, m.y);
+                
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+
+                const glowGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, m.radius * 1.5);
+                glowGrad.addColorStop(0, m.isReal ? 'rgba(56, 189, 248, 0.4)' : 'rgba(244, 63, 94, 0.2)');
+                glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = glowGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, m.radius * 1.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = m.isReal ? '#0ea5e9' : '#e11d48';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+
+                ctx.beginPath();
+                if (m.spriteType === 0) {
+                    ctx.moveTo(0, -m.radius);
+                    ctx.lineTo(m.radius, m.radius);
+                    ctx.lineTo(-m.radius, m.radius);
+                    ctx.closePath();
+                } else if (m.spriteType === 1) {
+                    ctx.arc(0, 0, m.radius, 0, Math.PI, true);
+                    ctx.lineTo(-m.radius, m.radius * 0.8);
+                    ctx.lineTo(-m.radius * 0.4, m.radius * 0.4);
+                    ctx.lineTo(0, m.radius * 0.8);
+                    ctx.lineTo(m.radius * 0.4, m.radius * 0.4);
+                    ctx.lineTo(m.radius, m.radius * 0.8);
+                    ctx.closePath();
+                } else {
+                    ctx.rect(-m.radius, -m.radius, m.radius * 2, m.radius * 2);
+                }
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(-4, -2, 3.5, 0, Math.PI * 2);
+                ctx.arc(4, -2, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(-4, -2, 1.5, 0, Math.PI * 2);
+                ctx.arc(4, -2, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            });
+        }
+
+        // 레이저 발사 격발 애니메이션 통제 
+        function drawLaserAnimation() {
+            state.laserProgress += 0.08;
+            if (state.laserProgress >= 1.0) {
+                state.laserProgress = 1.0;
+                
+                // 격발 판정이 성공한 경우에만 물리적인 파괴 연출 및 오답 시 몬스터 보호
+                if (state.lastShotCorrect) {
+                    state.laserHits.forEach(idx => {
+                        const m = state.monsters[idx];
+                        if (m) {
+                            createExplosion(mathToCanvas(m.x, m.y).x, mathToCanvas(m.x, m.y).y, m.isReal ? '#0ea5e9' : '#e11d48');
+                            state.monsters.splice(idx, 1);
+                        }
+                    });
+                }
+                state.laserHits = [];
+                state.isAnimating = false;
+                
+                // 성공 격발일 때만 다음 수식 및 문제로 이관
+                if (state.lastShotCorrect) {
+                    const hitCorrect = !state.monsters.some(m => m.isReal);
+                    if (hitCorrect) {
+                        nextProblem();
+                    }
+                }
+            }
+
+            const p1 = mathToCanvas(state.pointA.x, state.pointA.y);
+            const p2 = mathToCanvas(state.pointB.x, state.pointB.y);
+            const ext = getExtendedCoordinates(p1.x, p1.y, p2.x, p2.y);
+
+            ctx.save();
+            ctx.strokeStyle = state.round === 3 ? '#ff2a5f' : '#22d3ee';
+            ctx.lineWidth = 5;
+            ctx.shadowColor = state.round === 3 ? '#ff2a5f' : '#22d3ee';
+            ctx.shadowBlur = 12;
+
+            const currentX = ext.x1 + (ext.x2 - ext.x1) * state.laserProgress;
+            const currentY = ext.y1 + (ext.y2 - ext.y1) * state.laserProgress;
+
+            ctx.beginPath();
+            ctx.moveTo(ext.x1, ext.y1);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.8;
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.moveTo(ext.x1, ext.y1);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function getExtendedCoordinates(x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+
+            if (dx === 0 && dy === 0) return { x1, y1, x2, y2 };
+
+            const angle = Math.atan2(dy, dx);
+            const dist = 600; 
+
+            return {
+                x1: x1 - Math.cos(angle) * dist,
+                y1: y1 - Math.sin(angle) * dist,
+                x2: x1 + Math.cos(angle) * dist,
+                y2: y1 + Math.sin(angle) * dist
+            };
+        }
+
+        // 폭발 효과 파티클들을 그리는 함수
+        function drawParticles() {
+            state.particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        // 1, 2라운드용 드래그 조절기 점 A와 B를 화면에 그리는 함수
+        function drawControlPoints() {
+            const pA = mathToCanvas(state.pointA.x, state.pointA.y);
+            const pB = mathToCanvas(state.pointB.x, state.pointB.y);
+
+            ctx.save();
+            ctx.fillStyle = '#ef4444';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#ef4444';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(pA.x, pA.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 8px Orbitron, sans-serif';
+            ctx.fillText('A', pA.x, pA.y + 1);
+            ctx.restore();
+
+            ctx.save();
+            ctx.fillStyle = '#3b82f6';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#3b82f6';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(pB.x, pB.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 8px Orbitron, sans-serif';
+            ctx.fillText('B', pB.x, pB.y + 1);
+            ctx.restore();
+        }
+    </script>
+</body>
+</html>
